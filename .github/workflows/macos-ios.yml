@@ -1,8 +1,7 @@
 name: macOS and iOS CI
 
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -25,5 +24,7 @@ jobs:
       run: meson test -C build_macos
     - name: check otherbuilds
       run: otherbuilds/check.sh
+    - name: make build
+      run: ninja -C build
 
 
