@@ -11,8 +11,10 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: '3.x'
-    - run: sudo apt update && sudo apt install -y pkg-config libsamplerate0-dev libsndfile1-dev libfftw3-dev ladspa-sdk lv2-dev vamp-plugin-sdk libboost-test-dev meson ninja-build
-    - run: meson build_linux
+    - name: "Installing dependencies"
+      run: sudo apt update && sudo apt install -y pkg-config libsamplerate0-dev libsndfile1-dev libfftw3-dev ladspa-sdk lv2-dev vamp-plugin-sdk libboost-test-dev meson ninja-build
+    - name: "Configuring and building linux"
+      run: meson build_linux && ninja -C build_linux
       env:
         CC: gcc
     - name: upload linux logs
@@ -73,8 +75,12 @@ jobs:
       with:
         python-version: '3.x'
     - run: pip install meson ninja
-    - name: build windows
+    - name: configure windows
       run: meson build_windows
+      env:
+        CC: gcc
+    - name: make windows
+      run: ninja -C build_windows
       env:
         CC: gcc
     - name: upload windows logs
