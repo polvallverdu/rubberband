@@ -11,14 +11,14 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: '3.x'
-    - run: apt update && apt install -y pkg-config libsamplerate0-dev libsndfile1-dev libfftw3-dev ladspa-sdk lv2-dev vamp-plugin-sdk libboost-test-dev meson ninja-build
+    - run: sudo apt update && apt install -y pkg-config libsamplerate0-dev libsndfile1-dev libfftw3-dev ladspa-sdk lv2-dev vamp-plugin-sdk libboost-test-dev meson ninja-build
     - run: meson build_linux
       env:
         CC: gcc
     - uses: actions/upload-artifact@v1
       with:
         name: Linux_Meson_Testlog
-        path: build_linux/meson-logs/testlog.txt
+        path: build_linux/meson-logs/meson-log.txt
     - uses: actions/upload-artifact@v1
       if: failure()
       with:
@@ -46,7 +46,7 @@ jobs:
     - uses: actions/upload-artifact@v1
       with:
         name: MacOS_Meson_Testlog
-        path: build_macos/meson-logs/testlog.txt
+        path: build_macos/meson-logs/meson-log.txt
     - uses: actions/upload-artifact@v1
       with:
         name: MacOS_Rubberband
@@ -54,7 +54,7 @@ jobs:
     - uses: actions/upload-artifact@v1
       with:
         name: IOS_Meson_Testlog
-        path: build_ios/meson-logs/testlog.txt
+        path: build_ios/meson-logs/meson-log.txt
     - uses: actions/upload-artifact@v1
       with:
         name: IOS_Rubberband
@@ -74,6 +74,6 @@ jobs:
     - uses: actions/upload-artifact@v1
       with:
         name: Windows_Meson_Testlog
-        path: build_windows/meson-logs/testlog.txt
+        path: build_windows/meson-logs/meson-log.txt
 
 
