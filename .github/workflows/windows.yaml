@@ -11,7 +11,7 @@ jobs:
     - uses: actions/setup-python@v1
       with:
         python-version: '3.x'
-    - run: sudo apt update && apt install -y pkg-config libsamplerate0-dev libsndfile1-dev libfftw3-dev ladspa-sdk lv2-dev vamp-plugin-sdk libboost-test-dev meson ninja-build
+    - run: sudo apt update && sudo apt install -y pkg-config libsamplerate0-dev libsndfile1-dev libfftw3-dev ladspa-sdk lv2-dev vamp-plugin-sdk libboost-test-dev meson ninja-build
     - run: meson build_linux
       env:
         CC: gcc
@@ -63,7 +63,7 @@ jobs:
       uses: actions/upload-artifact@v1
       with:
         name: IOS_Rubberband
-        path: build_ios/rubberband-r3
+        path: build_ios/rubberband-r3.ipa
 
   windows:
     runs-on: windows-latest
@@ -82,5 +82,10 @@ jobs:
       with:
         name: Windows_Meson_Testlog
         path: build_windows/meson-logs/meson-log.txt
+    - name: upload windows rubberband
+      uses: actions/upload-artifact@v1
+      with:
+        name: Windows_Meson_Testlog
+        path: build_windows/rubberband-r3.exe
 
 
