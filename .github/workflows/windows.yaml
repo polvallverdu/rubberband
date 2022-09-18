@@ -16,12 +16,12 @@ jobs:
       env:
         CC: gcc
     - name: upload linux logs
-    - uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v1
       with:
         name: Linux_Meson_Testlog
         path: build_linux/meson-logs/meson-log.txt
     - name: upload linux rubberband
-    - uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v1
       with:
         name: Linux_Rubberband
         path: build_linux/rubberband-r3
@@ -45,22 +45,22 @@ jobs:
     - name: make ios
       run: ninja -C build_ios
     - name: upload macos logs
-    - uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v1
       with:
         name: MacOS_Meson_Testlog
         path: build_macos/meson-logs/meson-log.txt
     - name: upload macos rubberband
-    - uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v1
       with:
         name: MacOS_Rubberband
         path: build_macos/rubberband-r3
     - name: upload ios logs
-    - uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v1
       with:
         name: IOS_Meson_Testlog
         path: build_ios/meson-logs/meson-log.txt
     - name: upload ios rubberband
-    - uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v1
       with:
         name: IOS_Rubberband
         path: build_ios/rubberband-r3
@@ -74,11 +74,11 @@ jobs:
         python-version: '3.x'
     - run: pip install meson ninja
     - name: build windows
-    - run: meson build_windows
+      run: meson build_windows
       env:
         CC: gcc
     - name: upload windows logs
-    - uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v1
       with:
         name: Windows_Meson_Testlog
         path: build_windows/meson-logs/meson-log.txt
