@@ -15,12 +15,13 @@ jobs:
     - run: meson build_linux
       env:
         CC: gcc
+    - name: upload linux logs
     - uses: actions/upload-artifact@v1
       with:
         name: Linux_Meson_Testlog
         path: build_linux/meson-logs/meson-log.txt
+    - name: upload linux rubberband
     - uses: actions/upload-artifact@v1
-      if: failure()
       with:
         name: Linux_Rubberband
         path: build_linux/rubberband-r3
@@ -33,9 +34,9 @@ jobs:
       with:
         python-version: '3.x'
     - run: brew install gcc libsndfile libsamplerate vamp-plugin-sdk meson ninja
-    - name: configure macos
+    - name: build macos
       run: meson build_macos
-    - name: configure ios
+    - name: build ios
       run: meson build_ios --cross-file cross/ios.txt
       env:
         CC: gcc
@@ -43,18 +44,22 @@ jobs:
       run: ninja -C build_macos
     - name: make ios
       run: ninja -C build_ios
+    - name: upload macos logs
     - uses: actions/upload-artifact@v1
       with:
         name: MacOS_Meson_Testlog
         path: build_macos/meson-logs/meson-log.txt
+    - name: upload macos rubberband
     - uses: actions/upload-artifact@v1
       with:
         name: MacOS_Rubberband
         path: build_macos/rubberband-r3
+    - name: upload ios logs
     - uses: actions/upload-artifact@v1
       with:
         name: IOS_Meson_Testlog
         path: build_ios/meson-logs/meson-log.txt
+    - name: upload ios rubberband
     - uses: actions/upload-artifact@v1
       with:
         name: IOS_Rubberband
@@ -68,9 +73,11 @@ jobs:
       with:
         python-version: '3.x'
     - run: pip install meson ninja
+    - name: build windows
     - run: meson build_windows
       env:
         CC: gcc
+    - name: upload windows logs
     - uses: actions/upload-artifact@v1
       with:
         name: Windows_Meson_Testlog
