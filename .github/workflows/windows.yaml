@@ -24,7 +24,7 @@ jobs:
       uses: actions/upload-artifact@v1
       with:
         name: Linux_Rubberband
-        path: build_linux/rubberband-r3
+        path: build_linux/
 
   macos:
     runs-on: macos-latest
@@ -53,7 +53,7 @@ jobs:
       uses: actions/upload-artifact@v1
       with:
         name: MacOS_Rubberband
-        path: build_macos/rubberband-r3
+        path: build_macos/
     - name: upload ios logs
       uses: actions/upload-artifact@v1
       with:
@@ -63,7 +63,7 @@ jobs:
       uses: actions/upload-artifact@v1
       with:
         name: IOS_Rubberband
-        path: build_ios/rubberband-r3.ipa
+        path: build_ios/
 
   windows:
     runs-on: windows-latest
@@ -85,7 +85,7 @@ jobs:
     - name: upload windows rubberband
       uses: actions/upload-artifact@v1
       with:
-        name: Windows_Meson_Testlog
-        path: build_windows/rubberband-r3.exe
+        name: Windows_Rubberband
+        path: build_windows/
 
 
