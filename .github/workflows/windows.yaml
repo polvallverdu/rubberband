@@ -1,0 +1,79 @@
+name: ci_meson
+
+on:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.x'
+    - run: apt update && apt install -y pkg-config libsamplerate0-dev libsndfile1-dev libfftw3-dev ladspa-sdk lv2-dev vamp-plugin-sdk libboost-test-dev meson ninja-build
+    - run: meson build_linux
+      env:
+        CC: gcc
+    - uses: actions/upload-artifact@v1
+      with:
+        name: Linux_Meson_Testlog
+        path: build_linux/meson-logs/testlog.txt
+    - uses: actions/upload-artifact@v1
+      if: failure()
+      with:
+        name: Linux_Rubberband
+        path: build_linux/rubberband-r3
+
+  macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.x'
+    - run: brew install gcc libsndfile libsamplerate vamp-plugin-sdk meson ninja
+    - name: configure macos
+      run: meson build_macos
+    - name: configure ios
+      run: meson build_ios --cross-file cross/ios.txt
+      env:
+        CC: gcc
+    - name: make macos
+      run: ninja -C build_macos
+    - name: make ios
+      run: ninja -C build_ios
+    - uses: actions/upload-artifact@v1
+      with:
+        name: MacOS_Meson_Testlog
+        path: build_macos/meson-logs/testlog.txt
+    - uses: actions/upload-artifact@v1
+      with:
+        name: MacOS_Rubberband
+        path: build_macos/rubberband-r3
+    - uses: actions/upload-artifact@v1
+      with:
+        name: IOS_Meson_Testlog
+        path: build_ios/meson-logs/testlog.txt
+    - uses: actions/upload-artifact@v1
+      with:
+        name: IOS_Rubberband
+        path: build_ios/rubberband-r3
+
+  windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v1
+    - uses: actions/setup-python@v1
+      with:
+        python-version: '3.x'
+    - run: pip install meson ninja
+    - run: meson build_windows
+      env:
+        CC: gcc
+    - uses: actions/upload-artifact@v1
+      with:
+        name: Windows_Meson_Testlog
+        path: build_windows/meson-logs/testlog.txt
+
+
