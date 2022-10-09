@@ -100,13 +100,13 @@ public:
         Profiler profiler("GuidedPhaseAdvance::advance");
         
         int myFftBand = 0;
-        int i = 0;
+        int bandi = 0;
         for (const auto &fband : guidance[0]->fftBands) {
             if (fband.fftSize == m_parameters.fftSize) {
-                myFftBand = i;
+                myFftBand = bandi;
                 break;
             }
-            ++i;
+            ++bandi;
         }
 
         int bs = m_parameters.fftSize / 2 + 1;
@@ -135,13 +135,16 @@ public:
             for (int i = lowest; i <= highest; ++i) {
                 m_currentPeaks[c][i] = i;
             }
-            for (const auto &band : guidance[c]->phaseLockBands) {
+            for (int i = 0; i < guidance[c]->phaseLockBandCount; ++i) {
+                const auto &band = guidance[c]->phaseLockBands[i];
                 int startBin = binForFrequency
                     (band.f0, m_parameters.fftSize, m_parameters.sampleRate);
                 int endBin = binForFrequency
                     (band.f1, m_parameters.fftSize, m_parameters.sampleRate);
                 if (startBin > highest || endBin < lowest) continue;
+                if (endBin > highest) endBin = highest;
                 int count = endBin - startBin + 1;
+                if (count < 1) continue;
                 m_peakPicker.findNearestAndNextPeaks(mag[c],
                                                      startBin, count,
                                                      band.p, m_currentPeaks[c],
@@ -187,7 +190,8 @@ public:
             for (int i = lowest; i <= highest; ++i) {
                 process_t f = frequencyForBin
                     (i, m_parameters.fftSize, m_parameters.sampleRate);
-                while (f > g->phaseLockBands[phaseLockBand].f1) {
+                while (f > g->phaseLockBands[phaseLockBand].f1 &&
+                       phaseLockBand + 1 < g->phaseLockBandCount) {
                     ++phaseLockBand;
                 }
                 process_t ph = 0.0;

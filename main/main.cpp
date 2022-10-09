@@ -325,11 +325,12 @@ int main(int argc, char **argv)
             cerr << "(2)      --no-transients  Disable phase resynchronisation at transients" << endl;
             cerr << "(2)      --bl-transients  Band-limit phase resync to extreme frequencies" << endl;
             cerr << "(2)      --no-lamination  Disable phase lamination" << endl;
-            cerr << "(2)      --window-long    Use longer processing window (actual size may vary)" << endl;
-            cerr << "(2)      --window-short   Use shorter processing window" << endl;
             cerr << "(2)      --smoothing      Apply window presum and time-domain smoothing" << endl;
             cerr << "(2)      --detector-perc  Use percussive transient detector (as in pre-1.5)" << endl;
             cerr << "(2)      --detector-soft  Use soft transient detector" << endl;
+            cerr << "(2)      --window-long    Use longer processing window (actual size may vary)" << endl;
+            cerr << "         --window-short   Use shorter processing window (with the R3 engine" << endl;
+            cerr << "                          this is effectively a quick \"draft mode\")" << endl;
             cerr << "         --pitch-hq       In RT mode, use a slower, higher quality pitch shift" << endl;
             cerr << "         --centre-focus   Preserve focus of centre material in stereo" << endl;
             cerr << "                          (at a cost in width and individual channel quality)" << endl;
@@ -533,6 +534,20 @@ int main(int argc, char **argv)
     char *fileName = strdup(argv[optind++]);
     char *fileNameOut = strdup(argv[optind++]);
 
+    std::string extIn, extOut;
+    for (int i = strlen(fileName); i > 0; ) {
+        if (fileName[--i] == '.') {
+            extIn = fileName + i + 1;
+            break;
+        }
+    }
+    for (int i = strlen(fileNameOut); i > 0; ) {
+        if (fileNameOut[--i] == '.') {
+            extOut = fileNameOut + i + 1;
+            break;
+        }
+    }
+    
     SNDFILE *sndfile;
     SNDFILE *sndfileOut;
     SF_INFO sfinfo;
@@ -562,11 +577,39 @@ int main(int argc, char **argv)
     }
     
     sfinfoOut.channels = sfinfo.channels;
-    sfinfoOut.format = sfinfo.format;
     sfinfoOut.frames = int(sfinfo.frames * ratio + 0.1);
     sfinfoOut.samplerate = sfinfo.samplerate;
     sfinfoOut.sections = sfinfo.sections;
     sfinfoOut.seekable = sfinfo.seekable;
+
+    sfinfoOut.format = sfinfo.format;
+
+    if (extIn != extOut) {
+        std::string ex = extOut;
+        for (size_t i = 0; i < ex.size(); ++i) {
+            ex[i] = tolower(ex[i]);
+        }
+        int types = 0;
+        (void)sf_command(0, SFC_GET_FORMAT_MAJOR_COUNT, &types, sizeof(int));
+        bool found = false;
+        for (int i = 0; i < types; ++i) {
+            SF_FORMAT_INFO info;
+            info.format = i;
+            if (sf_command(0, SFC_GET_FORMAT_MAJOR, &info, sizeof(info))) {
+                continue;
+            } else {
+                if (ex == std::string(info.extension)) {
+                    sfinfoOut.format = info.format | SF_FORMAT_PCM_24;
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found) {
+            cerr << "NOTE: Unknown output file extension \"" << extOut
+                 << "\", will use same file format as input file" << endl;
+        }
+    }
     
     sndfileOut = sf_open(fileNameOut, SFM_WRITE, &sfinfoOut) ;
     if (!sndfileOut) {

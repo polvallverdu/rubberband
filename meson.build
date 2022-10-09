@@ -2,7 +2,7 @@
 project(
   'Rubber Band Library',
   'c', 'cpp',
-  version: '3.1.0-pre',
+  version: '3.1.0',
   license: 'GPL-2.0-or-later',
   default_options: [
     'cpp_std=c++11',
@@ -119,6 +119,7 @@ samplerate_dep = dependency('samplerate', version: '>= 0.1.8', required: false)
 speexdsp_dep = dependency('speexdsp', version: '>= 1.0.0', required: false)
 sndfile_dep = dependency('sndfile', version: '>= 1.0.16', required: false)
 vamp_dep = dependency('vamp-sdk', version: '>= 2.9', required: false)
+
 boost_unit_test_dep = dependency('boost', modules: ['unit_test_framework'], version: '>= 1.73', required: false)
 thread_dep = dependency('threads')
 have_ladspa = cpp.has_header('ladspa.h', args: extra_include_args)
@@ -126,10 +127,26 @@ have_lv2 = cpp.has_header('lv2.h', args: extra_include_args)
 have_sincos = cpp.has_function('sincos',
                                prefix: '#define _GNU_SOURCE\n#include <math.h>',
                                args: '-lm')
-have_jni = cpp.has_header('jni.h', args: extra_include_args)
 
 javac = find_program('javac', required: false)
 jar = find_program('jar', required: false)
+
+# Look for JNI only if javac and jar are found. This is because the
+# auto-JNI-dependency module in Meson 0.62 and 0.63 appears to bail
+# out of the build completely if it can't find javac, even when
+# required is false
+if javac.found() and jar.found()
+  jni_dep = dependency('jni', version: '>= 7.0.0', required: false)
+  if not jni_dep.found()
+    if cpp.has_header('jni.h', args: extra_include_args)
+      jni_dep = declare_dependency()
+    endif
+  endif
+else
+  # Declare jni_dep so it isn't totally undefined - but it won't be
+  # used below because we are conditional on javac/jar as well
+  jni_dep = declare_dependency()
+endif
 
 
 # Check FFT and resampler options and set up dependencies and paths
@@ -584,7 +601,7 @@ if get_option('default_library') != 'shared' and rubberband_additional_static_li
   )
 endif
 
-if have_jni and javac.found() and jar.found()
+if jni_dep.found() and javac.found() and jar.found()
   target_summary += { 'JNI library': [ true, 'Name: ' + rubberband_jni_name ] }
   message('Will build Java Native Interface')
   rubberband_jni = shared_library(
@@ -599,6 +616,7 @@ if have_jni and javac.found() and jar.found()
     ],
     dependencies: [
       rubberband_objlib_dep,
+      jni_dep,
       general_dependencies,
     ],
     # NB the JNI library is not versioned
@@ -619,10 +637,10 @@ if have_jni and javac.found() and jar.found()
   )
 else
   target_summary += { 'JNI library': false }
-  if not have_jni
-    message('Not building Java Native Interface: jni.h header not found')
-  else 
-    message('Not building Java Native Interface: Java compiler not found')
+  if not (javac.found() and jar.found())
+    message('Not building Java Native Interface: Java compiler or archiver missing')
+  else
+    message('Not building Java Native Interface: JNI header not found')
   endif
 endif
 

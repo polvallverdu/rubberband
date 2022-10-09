@@ -276,13 +276,23 @@ public:
      *   this causes the engine's full multi-resolution processing
      *   scheme to be used.
      *
-     *   \li \c OptionWindowShort - Use a shorter window. With the R2
-     *   engine this may result in crisper sound for audio that
-     *   depends strongly on its timing qualities. With the R3 engine,
-     *   this causes the engine to be restricted to a single window
-     *   size, resulting in both dramatically faster processing and
-     *   lower latency than OptionWindowStandard, but at the expense
-     *   of some sound quality.
+     *   \li \c OptionWindowShort - Use a shorter window. This has
+     *   different effects with R2 and R3 engines.
+     *
+     *   With the R2 engine it may result in crisper sound for audio
+     *   that depends strongly on its timing qualities, but is likely
+     *   to sound worse in other ways and will have similar
+     *   efficiency.
+     *
+     *   With the R3 engine, it causes the engine to be restricted to
+     *   a single window size, resulting in both dramatically faster
+     *   processing and lower delay than OptionWindowStandard, but at
+     *   the expense of some sound quality. It may still sound better
+     *   for non-percussive material than the R2 engine.
+     *
+     *   With both engines it reduces the start delay somewhat (see
+     *   RubberBandStretcher::getStartDelay) which may be useful for
+     *   real-time handling.
      *
      *   \li \c OptionWindowLong - Use a longer window. With the R2
      *   engine this is likely to result in a smoother sound at the
@@ -318,10 +328,10 @@ public:
      *   perceived pitch profile of the voice or instrument.
      *
      * 10. Flags prefixed \c OptionPitch control the method used for
-     * pitch shifting. In the R2 engine they may be changed at any
-     * time but affect only realtime mode (in offline mode the method
-     * cannot be changed). In the R3 engine they affect both realtime
-     * and offline modes but are fixed on construction.
+     * pitch shifting. These options affect only realtime mode. In
+     * offline mode the method is not adjustable. In the R2 engine
+     * these options may be changed at any time; in the R3 engine they
+     * may be set only on construction.
      *
      *   \li \c OptionPitchHighSpeed - Favour CPU cost over sound
      *   quality. This is the default. Use this when time-stretching
@@ -463,6 +473,13 @@ public:
     /**
      * Construct a time and pitch stretcher object to run at the given
      * sample rate, with the given number of channels.
+     *
+     * Both of the stretcher engines provide their best balance of
+     * quality with efficiency at sample rates of 44100 or 48000 Hz.
+     * Other rates may be used, and the stretcher should produce
+     * sensible output with any rate from 8000 to 192000 Hz, but you
+     * are advised to use 44100 or 48000 where practical. Do not use
+     * rates below 8000 or above 192000 Hz.
      *
      * Initial time and pitch scaling ratios and other processing
      * options may be provided. In particular, the behaviour of the

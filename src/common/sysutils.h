@@ -96,8 +96,6 @@ typedef double process_t;
 
 extern const char *system_get_platform_tag();
 extern bool system_is_multiprocessor();
-extern void system_specific_initialise();
-extern void system_specific_application_initialise();
 
 #ifdef _WIN32
 struct timeval { long tv_sec; long tv_usec; };
@@ -110,10 +108,6 @@ void gettimeofday(struct timeval *p, void *tz);
 
 #ifdef _WIN32
 
-#define MLOCK(a,b)   1
-#define MUNLOCK(a,b) 1
-#define MUNLOCK_SAMPLEBLOCK(a) 1
-
 namespace RubberBand {
 extern void system_memorybarrier();
 }
@@ -121,13 +115,7 @@ extern void system_memorybarrier();
 
 #else // !_WIN32
 
-#include <sys/mman.h>
-#include <dlfcn.h>
 #include <stdio.h>
-
-#define MLOCK(a,b)   mlock((char *)(a),(b))
-#define MUNLOCK(a,b) (munlock((char *)(a),(b)) ? (perror("munlock failed"), 0) : 0)
-#define MUNLOCK_SAMPLEBLOCK(a) do { if (!(a).empty()) { const float &b = *(a).begin(); MUNLOCK(&b, (a).capacity() * sizeof(float)); } } while(0);
 
 #ifdef __APPLE__
 #  if defined __MAC_10_12

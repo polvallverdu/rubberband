@@ -109,18 +109,19 @@ protected:
         int minInhop;
         int maxInhopWithReadahead;
         int maxInhop;
-        Limits(RubberBandStretcher::Options options) :
-            minPreferredOuthop(128),
-            maxPreferredOuthop(512),
+        Limits(RubberBandStretcher::Options options, double rate) :
+            // commented values are results when rate = 44100 or 48000
+            minPreferredOuthop(roundUpDiv(rate, 512)), // 128
+            maxPreferredOuthop(roundUpDiv(rate, 128)), // 512
             minInhop(1),
-            maxInhopWithReadahead(1024),
-            maxInhop(1024) {
+            maxInhopWithReadahead(roundUpDiv(rate, 32)), // 1024
+            maxInhop(roundUpDiv(rate, 32)) {             // 1024
             if (options & RubberBandStretcher::OptionWindowShort) {
                 // See note in calculateHop
-                minPreferredOuthop = 256;
-                maxPreferredOuthop = 640;
-                maxInhopWithReadahead = 512;
-                maxInhop = 1560;
+                minPreferredOuthop = roundUpDiv(rate, 256); // 256
+                maxPreferredOuthop = (roundUpDiv(rate, 128) * 5) / 4; // 640
+                maxInhopWithReadahead = roundUpDiv(rate, 128); // 512
+                maxInhop = (roundUpDiv(rate, 64) * 3) / 2; // 1536
             }
         }
     };
@@ -311,9 +312,9 @@ protected:
         int synthesisWindowLength();
     };
     
+    Log m_log;
     Parameters m_parameters;
     const Limits m_limits;
-    Log m_log;
 
     std::atomic<double> m_timeRatio;
     std::atomic<double> m_pitchScale;
@@ -365,6 +366,21 @@ protected:
         int polarFromBin;
         int polarBinCount;
     };
+
+    Parameters validateSampleRate(const Parameters &params) {
+        Parameters validated { params };
+        double minRate = 8000.0, maxRate = 192000.0;
+        if (params.sampleRate < minRate) {
+            m_log.log(0, "R3Stretcher: WARNING: Unsupported sample rate", params.sampleRate);
+            m_log.log(0, "R3Stretcher: Minimum rate is", minRate);
+            validated.sampleRate = minRate;
+        } else if (params.sampleRate > maxRate) {
+            m_log.log(0, "R3Stretcher: WARNING: Unsupported sample rate", params.sampleRate);
+            m_log.log(0, "R3Stretcher: Maximum rate is", maxRate);
+            validated.sampleRate = maxRate;
+        }
+        return validated;
+    }
     
     void convertToPolar(process_t *mag, process_t *phase,
                         const process_t *real, const process_t *imag,
@@ -402,21 +418,53 @@ protected:
 
         if (before) *before = false;
         if (after) *after = false;
+
+        // Some of the logic about when/whether to resample may have
+        // already been decided, because we might not have a
+        // resampler. This call is for the processing path, we don't
+        // make big decisions here and can't be saying we should
+        // resample if there is no resampler
         if (!m_resampler) return;
 
-        if (m_parameters.options &
-            RubberBandStretcher::OptionPitchHighConsistency) {
+        // In offline mode we always ignore the OptionPitch setting
+        // and resample afterwards, like OptionPitchHighConsistency
+        // (except that we don't resample for ratio of 1.0). This is
+        // because (a) the initial algorithm was developed and tested
+        // that way, (b) R2 works that way and nobody has ever
+        // complained, and (c) otherwise for the command-line tool
+        // (which is probably the most common way to use RB offline)
+        // we would have to choose between defaulting to lower-quality
+        // OptionPitchHighSpeed or offering yet another setting, both
+        // of which are undesirable.
+        
+        if (!isRealTime()) {
+            if (m_pitchScale != 1.0) {
+                // Offline, any pitch scale
+                if (after) *after = true;
+            }
+        } else if (m_parameters.options &
+                   RubberBandStretcher::OptionPitchHighConsistency) {
+            // RT, any pitch scale, HC
             if (after) *after = true;
             
         } else if (m_pitchScale != 1.0) {
-            if (m_pitchScale > 1.0 &&
-                (m_parameters.options &
-                 RubberBandStretcher::OptionPitchHighQuality)) {
-                if (after) *after = true;
+
+            bool hq = (m_parameters.options &
+                       RubberBandStretcher::OptionPitchHighQuality);
+            // We already handled OptionPitchHighConsistency, so if
+            // !hq then we must be HighSpeed
+            if (m_pitchScale > 1.0) {
+                if (hq) {
+                    if (after) *after = true;
+                } else {
+                    if (before) *before = true;
+                }
             } else if (m_pitchScale < 1.0) {
-                if (after) *after = true;
-            } else {
-                if (before) *before = true;
+                if (hq) {
+                    if (before) *before = true;
+                } else {
+                    if (after) *after = true;
+                }
             }
         }
     }        

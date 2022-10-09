@@ -33,6 +33,7 @@
 #include "../common/Resampler.h"
 #include "../common/Profiler.h"
 #include "../common/sysutils.h"
+#include "../common/mathmisc.h"
 
 #include <cassert>
 #include <cmath>
@@ -53,8 +54,6 @@ R2Stretcher::m_defaultIncrement = 256;
 
 const size_t
 R2Stretcher::m_defaultFftSize = 2048;
-
-static bool _initialised = false;
 
 R2Stretcher::R2Stretcher(size_t sampleRate,
                          size_t channels,
@@ -102,11 +101,6 @@ R2Stretcher::R2Stretcher(size_t sampleRate,
     m_baseFftSize(m_defaultFftSize)
 {
     Profiler profiler("R2Stretcher::R2Stretcher");
-    
-    if (!_initialised) {
-        system_specific_initialise();
-        _initialised = true;
-    }
 
     m_log.log(1, "R2Stretcher::R2Stretcher: rate, options",
               m_sampleRate, options);
@@ -372,16 +366,6 @@ R2Stretcher::getEffectiveRatio() const
     return m_timeRatio * m_pitchScale;
 }
 
-size_t
-R2Stretcher::roundUp(size_t value)
-{
-    if (!(value & (value - 1))) return value;
-    int bits = 0;
-    while (value) { ++bits; value >>= 1; }
-    value = 1 << bits;
-    return value;
-}
-
 void
 R2Stretcher::calculateSizes()
 {
@@ -401,7 +385,13 @@ R2Stretcher::calculateSizes()
         m_log.log(0, "WARNING: Time ratio must be greater than zero! Resetting it to default, no time stretch will happen", m_timeRatio);
         m_timeRatio = 1.0;
     }
-
+    if (m_pitchScale != m_pitchScale || m_timeRatio != m_timeRatio ||
+        m_pitchScale == m_pitchScale/2.0 || m_timeRatio == m_timeRatio/2.0) {
+        m_log.log(0, "WARNING: NaN or Inf presented for time ratio or pitch scale! Resetting it to default, no time stretch will happen", m_timeRatio, m_pitchScale);
+        m_timeRatio = 1.0;
+        m_pitchScale = 1.0;
+    }
+    
     double r = getEffectiveRatio();
 
     if (m_realtime) {

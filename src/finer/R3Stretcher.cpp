@@ -34,9 +34,9 @@ R3Stretcher::R3Stretcher(Parameters parameters,
                          double initialTimeRatio,
                          double initialPitchScale,
                          Log log) :
-    m_parameters(parameters),
-    m_limits(parameters.options),
     m_log(log),
+    m_parameters(validateSampleRate(parameters)),
+    m_limits(parameters.options, m_parameters.sampleRate),
     m_timeRatio(initialTimeRatio),
     m_pitchScale(initialPitchScale),
     m_formantScale(0.0),
@@ -96,7 +96,7 @@ R3Stretcher::R3Stretcher(Parameters parameters,
         classifierParameters.horizontalFilterLength = 7;
     }
 
-    int inRingBufferSize = getWindowSourceSize() * 2;
+    int inRingBufferSize = getWindowSourceSize() * 16;
     int outRingBufferSize = getWindowSourceSize() * 16;
 
     for (int c = 0; c < m_parameters.channels; ++c) {
@@ -145,10 +145,10 @@ R3Stretcher::R3Stretcher(Parameters parameters,
     m_prevOuthop = int(round(m_inhop * getEffectiveRatio()));
 
     if (!m_inhop.is_lock_free()) {
-        m_log.log(0, "WARNING: std::atomic<int> is not lock-free");
+        m_log.log(0, "R3Stretcher: WARNING: std::atomic<int> is not lock-free");
     }
     if (!m_timeRatio.is_lock_free()) {
-        m_log.log(0, "WARNING: std::atomic<double> is not lock-free");
+        m_log.log(0, "R3Stretcher: WARNING: std::atomic<double> is not lock-free");
     }
 }
 
@@ -158,7 +158,7 @@ R3Stretcher::ScaleData::analysisWindowShape()
     if (singleWindowMode) {
         return HannWindow;
     } else {
-        if (fftSize > 2048) return HannWindow;
+        if (fftSize < 1024 || fftSize > 2048) return HannWindow;
         else return NiemitaloForwardWindow;
     }
 }
@@ -175,7 +175,7 @@ R3Stretcher::ScaleData::synthesisWindowShape()
     if (singleWindowMode) {
         return HannWindow;
     } else {
-        if (fftSize > 2048) return HannWindow;
+        if (fftSize < 1024 || fftSize > 2048) return HannWindow;
         else return NiemitaloReverseWindow;
     }
 }
@@ -274,13 +274,7 @@ R3Stretcher::createResampler()
     Profiler profiler("R3Stretcher::createResampler");
     
     Resampler::Parameters resamplerParameters;
-
-    if (m_parameters.options & RubberBandStretcher::OptionPitchHighQuality) {
-        resamplerParameters.quality = Resampler::Best;
-    } else {
-        resamplerParameters.quality = Resampler::FastestTolerable;
-    }
-    
+    resamplerParameters.quality = Resampler::FastestTolerable;
     resamplerParameters.initialSampleRate = m_parameters.sampleRate;
     resamplerParameters.maxBufferSize = m_guideConfiguration.longestFftSize;
 
@@ -303,7 +297,7 @@ R3Stretcher::createResampler()
     areWeResampling(&before, &after);
     if (before) {
         if (after) {
-            m_log.log(0, "WARNING: createResampler: we think we are resampling both before and after!");
+            m_log.log(0, "R3Stretcher: WARNING: we think we are resampling both before and after!");
         } else {
             m_log.log(1, "createResampler: resampling before");
         }
@@ -317,6 +311,25 @@ R3Stretcher::createResampler()
 void
 R3Stretcher::calculateHop()
 {
+    if (m_pitchScale <= 0.0) {
+        // This special case is likelier than one might hope, because
+        // of naive initialisations in programs that set it from a
+        // variable
+        m_log.log(0, "WARNING: Pitch scale must be greater than zero! Resetting it to default, no pitch shift will happen", m_pitchScale);
+        m_pitchScale = 1.0;
+    }
+    if (m_timeRatio <= 0.0) {
+        // Likewise
+        m_log.log(0, "WARNING: Time ratio must be greater than zero! Resetting it to default, no time stretch will happen", m_timeRatio);
+        m_timeRatio = 1.0;
+    }
+    if (m_pitchScale != m_pitchScale || m_timeRatio != m_timeRatio ||
+        m_pitchScale == m_pitchScale/2.0 || m_timeRatio == m_timeRatio/2.0) {
+        m_log.log(0, "WARNING: NaN or Inf presented for time ratio or pitch scale! Resetting it to default, no time stretch will happen", m_timeRatio, m_pitchScale);
+        m_timeRatio = 1.0;
+        m_pitchScale = 1.0;
+    }
+
     double ratio = getEffectiveRatio();
 
     // In R2 we generally targeted a certain inhop, and calculated
@@ -356,12 +369,12 @@ R3Stretcher::calculateHop()
     
     double inhop = proposedOuthop / ratio;
     if (inhop < m_limits.minInhop) {
-        m_log.log(0, "WARNING: Ratio yields ideal inhop < minimum, results may be suspect", inhop, m_limits.minInhop);
+        m_log.log(0, "R3Stretcher: WARNING: Ratio yields ideal inhop < minimum, results may be suspect", inhop, m_limits.minInhop);
         inhop = m_limits.minInhop;
     }
     if (inhop > m_limits.maxInhop) {
         // Log level 1, this is not as big a deal as < minInhop above
-        m_log.log(1, "WARNING: Ratio yields ideal inhop > maximum, results may be suspect", inhop, m_limits.maxInhop);
+        m_log.log(1, "R3Stretcher: WARNING: Ratio yields ideal inhop > maximum, results may be suspect", inhop, m_limits.maxInhop);
         inhop = m_limits.maxInhop;
     }
 
@@ -678,7 +691,10 @@ R3Stretcher::process(const float *const *input, size_t samples, bool final)
         
         if (ws == 0) {
             m_log.log(0, "R3Stretcher::process: WARNING: Forced to increase input buffer size. Either setMaxProcessSize was not properly called, process is being called repeatedly without retrieve, or an internal error has led to an incorrect resampler output calculation. Samples to write", remaining);
-            size_t newSize = m_channelData[0]->inbuf->getSize() + remaining;
+            size_t oldSize = m_channelData[0]->inbuf->getSize();
+            size_t newSize = oldSize + remaining;
+            if (newSize < oldSize * 2) newSize = oldSize * 2;
+            m_log.log(0, "R3Stretcher::process: old and new sizes", oldSize, newSize);
             for (int c = 0; c < m_parameters.channels; ++c) {
                 auto newBuf = m_channelData[c]->inbuf->resized(newSize);
                 m_channelData[c]->inbuf =
@@ -919,7 +935,7 @@ R3Stretcher::consume()
         if (advanceCount > readSpace) {
             // This should happen only when draining (Finished)
             if (m_mode != ProcessMode::Finished) {
-                m_log.log(0, "WARNING: readSpace < inhop when processing is not yet finished", readSpace, inhop);
+                m_log.log(0, "R3Stretcher: WARNING: readSpace < inhop when processing is not yet finished", readSpace, inhop);
             }
             advanceCount = readSpace;
         }
@@ -1370,6 +1386,11 @@ R3Stretcher::synthesiseChannel(int c, int outhop, bool draining)
         int highBin = binForFrequency(band.f1, fftSize, m_parameters.sampleRate);
         if (highBin % 2 == 0 && highBin > 0) --highBin;
 
+        int n = scale->mag.size();
+        if (lowBin >= n) lowBin = n - 1;
+        if (highBin >= n) highBin = n - 1;
+        if (highBin < lowBin) highBin = lowBin;
+        
         if (lowBin > 0) {
             v_zero(scale->real.data(), lowBin);
             v_zero(scale->imag.data(), lowBin);

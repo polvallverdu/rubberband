@@ -122,8 +122,14 @@ public:
         m_log.log(1, "Guide: rate and single-window mode",
                   rate, m_parameters.singleWindowMode);
 
-        int classificationFftSize = 
-            roundUp(int(ceil(parameters.sampleRate / 32.0)));
+        int classificationFftSize = roundUpDiv(parameters.sampleRate, 32);
+
+        int minClassificationFftSize = 1024;
+        if (classificationFftSize < minClassificationFftSize) {
+            m_log.log(1, "Guide: sample rate is too low to work well");
+            m_log.log(1, "Guide: rounding up classification FFT size from and to", classificationFftSize, minClassificationFftSize);
+            classificationFftSize = minClassificationFftSize;
+        }
         
         m_configuration.classificationFftSize = classificationFftSize;
         
@@ -235,7 +241,7 @@ public:
             guidance.phaseLockBands[0].f1 = 1600.0;
             
             guidance.phaseLockBands[1].p = 2;
-            guidance.phaseLockBands[1].beta = betaFor(4800.0, ratio);
+            guidance.phaseLockBands[1].beta = betaFor(5000.0, ratio);
             guidance.phaseLockBands[1].f0 = 1600.0;
             guidance.phaseLockBands[1].f1 = 7000.0;
             
@@ -246,6 +252,15 @@ public:
 
             if (outhop > 256) {
                 guidance.phaseLockBands[2].p = 4;
+            }
+
+            for (int i = 0; i < 3; ++i) {
+                if (guidance.phaseLockBands[i].f0 > nyquist) {
+                    guidance.phaseLockBands[i].f0 = nyquist;
+                }
+                if (guidance.phaseLockBands[i].f1 > nyquist) {
+                    guidance.phaseLockBands[i].f1 = nyquist;
+                }
             }
             
         } else {
@@ -388,7 +403,7 @@ public:
             guidance.phaseLockBands[1].f1 = mid;
         
             guidance.phaseLockBands[2].p = 3;
-            guidance.phaseLockBands[2].beta = betaFor(4800.0, ratio);
+            guidance.phaseLockBands[2].beta = betaFor(5000.0, ratio);
             guidance.phaseLockBands[2].f0 = mid;
             guidance.phaseLockBands[2].f1 = higher;
             
@@ -461,16 +476,6 @@ protected:
     double m_maxLower;
     double m_maxHigher;
     
-    // near-dupe with R2 RubberBandStretcher::Impl
-    int roundUp(int value) const {
-        if (value < 1) return 1;
-        if (!(value & (value - 1))) return value;
-        int bits = 0;
-        while (value) { ++bits; value >>= 1; }
-        value = 1 << bits;
-        return value;
-    }
-
     void updateForSilence(Guidance &guidance) const {
 //        std::cout << "phase reset on silence" << std::endl;
         double nyquist = m_parameters.sampleRate / 2.0;
@@ -575,6 +580,7 @@ protected:
         int b = binForFrequency(f, m_configuration.classificationFftSize,
                                 m_parameters.sampleRate);
         int n = m_configuration.classificationFftSize/2;
+        if (b > n) b = n;
         for (int i = 0; i < 3; ++i) {
             if (b < n && magnitudes[b+1] < magnitudes[b]) {
                 ++b;
