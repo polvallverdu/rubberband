@@ -14,7 +14,7 @@ jobs:
     - name: "Installing dependencies"
       run: sudo apt update && sudo apt install -y pkg-config libsamplerate0-dev libsndfile1-dev libfftw3-dev ladspa-sdk lv2-dev vamp-plugin-sdk libboost-test-dev meson ninja-build
     - name: "Configuring and building linux"
-      run: meson build_linux && ninja -C build_linux
+      run: meson build_linux -Dresampler=libsamplerate && ninja -C build_linux
       env:
         CC: gcc
     - name: upload linux logs
@@ -37,9 +37,9 @@ jobs:
         python-version: '3.x'
     - run: brew install gcc libsndfile libsamplerate vamp-plugin-sdk meson ninja
     - name: build macos
-      run: meson build_macos
+      run: meson build_macos -Dresampler=libsamplerate
     - name: build ios
-      run: meson build_ios --cross-file cross/ios.txt
+      run: meson build_ios -Dresampler=libsamplerate --cross-file cross/ios.txt
       env:
         CC: gcc
     - name: make macos
@@ -76,7 +76,7 @@ jobs:
         python-version: '3.x'
     - run: pip install meson ninja
     - name: configure windows
-      run: meson build_windows
+      run: meson build_windows -Dresampler=libsamplerate
       env:
         CC: gcc
     - name: make windows
