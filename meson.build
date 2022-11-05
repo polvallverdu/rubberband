@@ -2,7 +2,7 @@
 project(
   'Rubber Band Library',
   'c', 'cpp',
-  version: '3.1.0',
+  version: '3.1.2',
   license: 'GPL-2.0-or-later',
   default_options: [
     'cpp_std=c++11',
@@ -117,35 +117,41 @@ sleef_dep = dependency('sleef', version: '>= 3.3.0', required: false)
 sleefdft_dep = dependency('sleefdft', version: '>= 3.3.0', required: false)
 samplerate_dep = dependency('samplerate', version: '>= 0.1.8', required: false)
 speexdsp_dep = dependency('speexdsp', version: '>= 1.0.0', required: false)
-sndfile_dep = dependency('sndfile', version: '>= 1.0.16', required: false)
-vamp_dep = dependency('vamp-sdk', version: '>= 2.9', required: false)
 
-boost_unit_test_dep = dependency('boost', modules: ['unit_test_framework'], version: '>= 1.73', required: false)
+sndfile_dep = dependency('sndfile', version: '>= 1.0.16', required: get_option('cmdline'))
+vamp_dep = dependency('vamp-sdk', version: '>= 2.9', required: get_option('vamp'))
+boost_unit_test_dep = dependency('boost', modules: ['unit_test_framework'], version: '>= 1.73', required: get_option('tests'))
 thread_dep = dependency('threads')
-have_ladspa = cpp.has_header('ladspa.h', args: extra_include_args)
-have_lv2 = cpp.has_header('lv2.h', args: extra_include_args)
+
+have_ladspa = cpp.has_header('ladspa.h', args: extra_include_args, required: get_option('ladspa'))
+have_lv2 = cpp.has_header('lv2.h', args: extra_include_args, required: get_option('lv2'))
+
 have_sincos = cpp.has_function('sincos',
                                prefix: '#define _GNU_SOURCE\n#include <math.h>',
                                args: '-lm')
 
-javac = find_program('javac', required: false)
-jar = find_program('jar', required: false)
 
-# Look for JNI only if javac and jar are found. This is because the
-# auto-JNI-dependency module in Meson 0.62 and 0.63 appears to bail
-# out of the build completely if it can't find javac, even when
-# required is false
-if javac.found() and jar.found()
+# Find out whether we can build the optional JNI target. Thanks to Eli
+# Schwartz for the fix here; this has been through a few previous
+# iterations. Initially we just looked for jni.h, but it's often in an
+# obscure place so that didn't work very well. Then tried Meson's
+# automatic dependency('jni') handling, but that bails out in Meson
+# 0.62/0.63 if javac is not present (even if required is false). Then
+# tried guarding that check behind a successful find_program('javac'),
+# but that bails out on systems in which a stub javac is installed
+# that is not a compiler (because the subsequent Meson jni magic still
+# requires javac as a compiler). Now try adding Java as a complete
+# language pack, optionally, and only go on to JNI if that succeeds,
+# making sure that nothing "clever" happens if Java is not found.
+# Note even if jni_dep is found, we still need to check that the
+# compiler can find jni.h because the jni autodetection can't really
+# be trusted, especially in a macOS frameworks environment.
+#
+have_jni = false
+have_java = add_languages('java', required: get_option('jni'))
+if have_java
   jni_dep = dependency('jni', version: '>= 7.0.0', required: false)
-  if not jni_dep.found()
-    if cpp.has_header('jni.h', args: extra_include_args)
-      jni_dep = declare_dependency()
-    endif
-  endif
-else
-  # Declare jni_dep so it isn't totally undefined - but it won't be
-  # used below because we are conditional on javac/jar as well
-  jni_dep = declare_dependency()
+  have_jni = cpp.has_header('jni.h', dependencies: jni_dep, args: extra_include_args)
 endif
 
 
@@ -367,13 +373,13 @@ if not vamp_dep.found()
                               dirs: get_option('extra_lib_dirs'),
                               has_headers: ['vamp-sdk.h'],
                               header_args: extra_include_args,
-                              required: false)
+                              required: get_option('vamp'))
   if not vamp_dep.found()
     vamp_dep = cpp.find_library('vamp-sdk',
                                 dirs: get_option('extra_lib_dirs'),
                                 has_headers: ['vamp-sdk.h'],
                                 header_args: extra_include_args,
-                                required: false)
+                                required: get_option('vamp'))
   endif
 endif
 have_vamp = vamp_dep.found()
@@ -383,13 +389,13 @@ if not sndfile_dep.found()
                                  dirs: get_option('extra_lib_dirs'),
                                  has_headers: ['sndfile.h'],
                                  header_args: extra_include_args,
-                                 required: false)
+                                 required: get_option('cmdline'))
   if not sndfile_dep.found()
     sndfile_dep = cpp.find_library('sndfile-1',
                                    dirs: get_option('extra_lib_dirs'),
                                    has_headers: ['sndfile.h'],
                                    header_args: extra_include_args,
-                                   required: false)
+                                   required: get_option('cmdline'))
   endif
 endif
 have_sndfile = sndfile_dep.found()
@@ -507,7 +513,7 @@ if cpp.get_id() == 'msvc'
   #
   if get_option('default_library') != 'shared'
     rubberband_additional_static_lib = 'rubberband-static'
-  endif    
+  endif
   rubberband_library_name = 'rubberband'
   rubberband_program_name = 'rubberband-program'
   rubberband_program_name_r3 = 'rubberband-program-r3'
@@ -601,7 +607,7 @@ if get_option('default_library') != 'shared' and rubberband_additional_static_li
   )
 endif
 
-if jni_dep.found() and javac.found() and jar.found()
+if have_jni
   target_summary += { 'JNI library': [ true, 'Name: ' + rubberband_jni_name ] }
   message('Will build Java Native Interface')
   rubberband_jni = shared_library(
@@ -622,22 +628,10 @@ if jni_dep.found() and javac.found() and jar.found()
     # NB the JNI library is not versioned
     install: true,
   )
-  rubberband_class = custom_target(
-    'rubberband_class',
-    input: 'com/breakfastquay/rubberband/RubberBandStretcher.java',
-    output: 'RubberBandStretcher.class',
-    command: [ javac, '@INPUT@', '-d', '@OUTDIR@' ],
-  )
-  rubberband_jar = custom_target(
-    'rubberband_jar',
-    input: rubberband_class,
-    output: 'rubberband.jar',
-    command: [ jar, 'cvf', '@OUTPUT@', 'com/breakfastquay/rubberband/@INPUT@' ],
-    build_by_default: true,
-  )
+  jar('rubberband', 'com/breakfastquay/rubberband/RubberBandStretcher.java')
 else
   target_summary += { 'JNI library': false }
-  if not (javac.found() and jar.found())
+  if not have_java
     message('Not building Java Native Interface: Java compiler or archiver missing')
   else
     message('Not building Java Native Interface: JNI header not found')
