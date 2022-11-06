@@ -1,4 +1,4 @@
-name: ci_meson
+name: ci_meson_defaults
 
 on:
   workflow_dispatch:
