@@ -39,9 +39,9 @@ jobs:
         python-version: '3.x'
     - run: brew install gcc libsndfile libsamplerate vamp-plugin-sdk meson ninja
     - name: build macos
-      run: meson build_macos -Dresampler=libsamplerate
+      run: meson build_macos
     - name: build ios
-      run: meson build_ios -Dresampler=libsamplerate --cross-file cross/ios.txt
+      run: meson build_ios --cross-file cross/ios.txt
       env:
         CC: gcc
     - name: make macos
@@ -78,7 +78,7 @@ jobs:
         python-version: '3.x'
     - run: pip install meson ninja
     - name: configure windows
-      run: meson build_windows -Dfft=fftw -Dresampler=libsamplerate
+      run: meson build_windows
       env:
         CC: gcc
     - name: make windows
