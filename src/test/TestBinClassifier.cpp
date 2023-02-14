@@ -3,7 +3,7 @@
 /*
     Rubber Band Library
     An audio time-stretching and pitch-shifting library.
-    Copyright 2007-2022 Particular Programs Ltd.
+    Copyright 2007-2023 Particular Programs Ltd.
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License as
@@ -33,7 +33,10 @@
 #include "../common/sysutils.h"
 
 using namespace RubberBand;
-using namespace std;
+
+using std::vector;
+using std::string;
+
 namespace tt = boost::test_tools;
 
 // We use the symbols H, X, and _ for harmonic, percussive, and

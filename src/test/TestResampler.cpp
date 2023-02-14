@@ -3,7 +3,7 @@
 /*
     Rubber Band Library
     An audio time-stretching and pitch-shifting library.
-    Copyright 2007-2022 Particular Programs Ltd.
+    Copyright 2007-2023 Particular Programs Ltd.
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License as
@@ -33,8 +33,12 @@
 #include <cmath>
 #include <iostream>
 
-using namespace std;
 using namespace RubberBand;
+
+using std::cerr;
+using std::endl;
+
+using std::vector;
 
 BOOST_AUTO_TEST_SUITE(TestResampler)
 
